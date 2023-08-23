@@ -43,9 +43,10 @@ Here's how you can contribute:
 
 1. Clone the repository:
 
-```bash
-git clone https://github.com/AdrianBailador/smartvalidationslibrary.git
 ```
+git clone https://github.com/AdrianBailador/SmartValidationsLibrary.git
+```
+
 
 2. Make your desired changes.
 3. Write tests ensuring the validity of your changes.
@@ -61,7 +62,7 @@ MIT
 
 **Links**:
 
-[SmartValidationsLibrary]: https://github.com/AdrianBailador/smartvalidationslibrary 
+[SmartValidationsLibrary]: https://github.com/AdrianBailador/SmartValidationsLibrary 
 [C#]: https://docs.microsoft.com/en-us/dotnet/csharp/
 [Regex]: https://docs.microsoft.com/en-us/dotnet/standard/base-types/regular-expressions
 
