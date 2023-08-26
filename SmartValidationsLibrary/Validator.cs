@@ -5,20 +5,62 @@ using System.Text.RegularExpressions;
 
 namespace SmartValidationsLibrary
 {
+    public class ValidationResult
+    {
+        public bool IsValid { get; set; }
+        public string ErrorMessage { get; set; }
+    }
 
-        public static class Validator
+    public interface IValidationAttribute
+    {
+        ValidationResult Validate(object value);
+    }
+
+    [AttributeUsage(AttributeTargets.Property, Inherited = false, AllowMultiple = true)]
+    sealed class EmailValidationAttribute : Attribute, IValidationAttribute
+    {
+        public ValidationResult Validate(object value)
         {
-            public class ValidationException : Exception
-            {
-                public ValidationException(string message) : base(message) { }
-            }
+            return Validator.IsValidEmail(value?.ToString());
+        }
+    }
 
-            public class UnsupportedRegionException : ValidationException
-            {
-                public UnsupportedRegionException(string region) : base($"Unsupported region: {region}") { }
-            }
+    [AttributeUsage(AttributeTargets.Property, Inherited = false, AllowMultiple = true)]
+    sealed class PhoneNumberValidationAttribute : Attribute, IValidationAttribute
+    {
+        private readonly Region _region;
 
-            private static Dictionary<Region, string> PhoneNumberPatterns = new Dictionary<Region, string>
+        public PhoneNumberValidationAttribute(Region region)
+        {
+            _region = region;
+        }
+
+        public ValidationResult Validate(object value)
+        {
+            return Validator.IsValidPhoneNumber(value?.ToString(), _region);
+        }
+    }
+
+    [AttributeUsage(AttributeTargets.Property, Inherited = false, AllowMultiple = true)]
+    sealed class CustomValidationAttribute : Attribute, IValidationAttribute
+    {
+        private readonly string _validationName;
+
+        public CustomValidationAttribute(string validationName)
+        {
+            _validationName = validationName;
+        }
+
+        public ValidationResult Validate(object value)
+        {
+            return Validator.IsValidCustom(value?.ToString(), _validationName);
+        }
+    }
+   
+
+    public static class Validator
+    {
+        private static readonly Dictionary<Region, string> PhoneNumberPatterns = new Dictionary<Region, string>
         {
             { Region.USA, @"^\(?\d{3}\)?-?\d{3}-\d{4}$" },
             { Region.UK, @"^(\+44\s?7\d{3}|\(?07\d{3}\)?)\s?\d{3}\s?\d{4}$" },
@@ -26,92 +68,60 @@ namespace SmartValidationsLibrary
             { Region.Ireland, @"^08\d{8}$" }
         };
 
-            public static Dictionary<string, string> CustomValidations = new Dictionary<string, string>();
+        public static readonly Dictionary<string, string> CustomValidations = new Dictionary<string, string>();
 
-            public static bool IsValidEmail(string email)
-            {
-                const string EmailPattern = @"^[^@\s]+@[^@\s]+\.[^@\s]+$";
-                if (!Regex.IsMatch(email, EmailPattern, RegexOptions.IgnoreCase))
-                    throw new ValidationException("Invalid email.");
-                return true;
-            }
-
-            public static bool IsValidPhoneNumber(string phoneNumber, Region region)
-            {
-                if (PhoneNumberPatterns.TryGetValue(region, out string pattern))
-                {
-                    if (!Regex.IsMatch(phoneNumber, pattern))
-                        throw new ValidationException($"Invalid {region} phone number.");
-                    return true;
-                }
-                throw new UnsupportedRegionException(region.ToString());
-            }
-
-            public static bool IsValidDate(string date)
-            {
-                if (!DateTime.TryParse(date, out _))
-                    throw new ValidationException("Invalid date.");
-                return true;
-            }
-
-            public static bool IsValidCustom(string input, string validationName)
-            {
-                if (CustomValidations.TryGetValue(validationName, out string pattern))
-                {
-                    if (!Regex.IsMatch(input, pattern))
-                        throw new ValidationException($"Invalid input for {validationName}.");
-                    return true;
-                }
-                throw new ValidationException($"Custom validation {validationName} not found.");
-            }
-
-            public static void AddCustomValidation(string validationName, string pattern)
-            {
-                if (!CustomValidations.ContainsKey(validationName))
-                    CustomValidations.Add(validationName, pattern);
-            }
-        }
-
-        [AttributeUsage(AttributeTargets.Property, Inherited = false, AllowMultiple = true)]
-        sealed class EmailValidationAttribute : Attribute
+        public static ValidationResult IsValidEmail(string email)
         {
-            public bool IsValid(string email)
-            {
-                return Validator.IsValidEmail(email);
-            }
+            const string EmailPattern = @"^(?=.{1,256})(?=.{1,64}@.{1,255}$)(?=.{1,64}[^@]{1,255}$)((?=.{1,64}[^\W_])(?=.{1,64}[\w\d-])(?=.{1,64}[\w\d.'-])[a-zA-Z\d][\w\d.'-]*[a-zA-Z\d]|\""[!#-[\]-~]*\"")@(?=.{1,255}[^\W_])(?=.{1,255}[\w\d-])(?=.{1,255}[\w\d.])[a-zA-Z\d][\w\d.-]*[a-zA-Z\d]\.([a-zA-Z]{2,19}|(xn--[a-zA-Z\d]+))$";
+
+
+            if (Regex.IsMatch(email, EmailPattern))
+                return new ValidationResult { IsValid = true };
+
+            return new ValidationResult { IsValid = false, ErrorMessage = "Invalid email." };
         }
 
-        [AttributeUsage(AttributeTargets.Property, Inherited = false, AllowMultiple = true)]
-        sealed class PhoneNumberValidationAttribute : Attribute
+        public static ValidationResult IsValidPhoneNumber(string phoneNumber, Region region)
         {
-            private readonly Region _region;
-
-            public PhoneNumberValidationAttribute(Region region)
+            if (PhoneNumberPatterns.TryGetValue(region, out string pattern))
             {
-                _region = region;
+                if (Regex.IsMatch(phoneNumber, pattern))
+                    return new ValidationResult { IsValid = true };
+
+                return new ValidationResult { IsValid = false, ErrorMessage = $"Invalid {region} phone number." };
             }
 
-            public bool IsValid(string phoneNumber)
-            {
-                return Validator.IsValidPhoneNumber(phoneNumber, _region);
-            }
+            return new ValidationResult { IsValid = false, ErrorMessage = $"Unsupported region: {region}" };
         }
-        [AttributeUsage(AttributeTargets.Property, Inherited = false, AllowMultiple = true)]
-        sealed class CustomValidationAttribute : Attribute
+
+        public static ValidationResult IsValidDate(string date)
         {
-            private readonly string _validationName;
+            if (DateTime.TryParse(date, out _))
+                return new ValidationResult { IsValid = true };
 
-            public CustomValidationAttribute(string validationName)
-            {
-                _validationName = validationName;
-            }
-
-            public bool IsValid(string input)
-            {
-                return Validator.IsValidCustom(input, _validationName);
-            }
-
-            public string ValidationName => _validationName;
+            return new ValidationResult { IsValid = false, ErrorMessage = "Invalid date." };
         }
+
+        public static ValidationResult IsValidCustom(string input, string validationName)
+        {
+            if (CustomValidations.TryGetValue(validationName, out string pattern))
+            {
+                if (Regex.IsMatch(input, pattern))
+                    return new ValidationResult { IsValid = true };
+
+                return new ValidationResult { IsValid = false, ErrorMessage = $"Invalid input for {validationName}." };
+            }
+
+            return new ValidationResult { IsValid = false, ErrorMessage = $"Custom validation {validationName} not found." };
+        }
+
+        public static void AddCustomValidation(string validationName, string pattern)
+        {
+            if (!CustomValidations.ContainsKey(validationName))
+                CustomValidations.Add(validationName, pattern);
+            else
+                throw new InvalidOperationException($"Validation name {validationName} already exists.");
+        }
+    }
 
 }
