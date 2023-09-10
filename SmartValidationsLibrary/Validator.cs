@@ -8,6 +8,7 @@ namespace SmartValidationsLibrary
     public class ValidationResult
     {
         public bool IsValid { get; set; }
+        public string PropertyName { get; set; }
         public string ErrorMessage { get; set; }
     }
 
@@ -21,7 +22,9 @@ namespace SmartValidationsLibrary
     {
         public ValidationResult Validate(object value)
         {
-            return Validator.IsValidEmail(value?.ToString());
+            var result = Validator.IsValidEmail(value?.ToString());
+            result.PropertyName = this.GetType().Name.Replace("Attribute", "");
+            return result;
         }
     }
 
@@ -37,7 +40,9 @@ namespace SmartValidationsLibrary
 
         public ValidationResult Validate(object value)
         {
-            return Validator.IsValidPhoneNumber(value?.ToString(), _region);
+            var result = Validator.IsValidPhoneNumber(value?.ToString(), _region);
+            result.PropertyName = this.GetType().Name.Replace("Attribute", "");
+            return result;
         }
     }
 
@@ -53,10 +58,13 @@ namespace SmartValidationsLibrary
 
         public ValidationResult Validate(object value)
         {
-            return Validator.IsValidCustom(value?.ToString(), _validationName);
+            var result = Validator.IsValidCustom(value?.ToString(), _validationName);
+            result.PropertyName = this.GetType().Name.Replace("Attribute", "");
+            return result;
         }
     }
-   
+
+
 
     public static class Validator
     {
@@ -122,6 +130,33 @@ namespace SmartValidationsLibrary
             else
                 throw new InvalidOperationException($"Validation name {validationName} already exists.");
         }
+
+        public static class EntityValidator
+        {
+            public static List<ValidationResult> ValidateEntity<T>(T entity)
+            {
+                var validationResults = new List<ValidationResult>();
+
+                foreach (var property in typeof(T).GetProperties())
+                {
+                    foreach (Attribute attribute in property.GetCustomAttributes(true))
+                    {
+                        if (attribute is IValidationAttribute validationAttribute)
+                        {
+                            var result = validationAttribute.Validate(property.GetValue(entity));
+                            if (!result.IsValid)
+                            {
+                                result.PropertyName = property.Name; 
+                                validationResults.Add(result);
+                            }
+                        }
+                    }
+                }
+
+                return validationResults;
+            }
+        }
+
     }
 
 }
